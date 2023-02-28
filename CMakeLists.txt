@@ -8,7 +8,7 @@ set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -pg")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 
-add_executable(paho-mqtt-perf src/main.c)
+add_executable(paho-mqtt-perf src/main.c src/publish.c src/logger.c src/utils.c src/global.c src/subscribe.c src/connect.c)
 
 target_link_libraries(paho-mqtt-perf PRIVATE Threads::Threads)
 target_link_libraries(paho-mqtt-perf PUBLIC eclipse-paho-mqtt-c::paho-mqtt3as-static)
