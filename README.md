@@ -45,6 +45,6 @@ benchmark in which the publisher keeps sending 4096-byte messages.
 # Run the subscriber on the 1st site
 ./build/paho-mqtt-perf -r subscriber -t MYTOPIC
 
-# Run the publisher on the 1st site
+# Run the publisher on the 2nd site
 ./build/paho-mqtt-perf -r publisher -t MYTOPIC -p 4096
 ```
