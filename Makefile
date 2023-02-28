@@ -8,10 +8,10 @@ build:
 ifdef TOOLCHAIN_FILE
 	cmake -B build -S . \
 		-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE) \
-		-DCMAKE_BUILD_TYPE=Release
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo
 else
 	cmake -B build -S . \
-		-DCMAKE_BUILD_TYPE=Release
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo
 endif
 
 	cmake --build build
