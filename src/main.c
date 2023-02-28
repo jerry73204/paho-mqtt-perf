@@ -35,10 +35,12 @@ struct timespec SINCE_START;
 struct timespec SINCE_LAST_RECORD;
 thrd_t logger_thread;
 
-void reset_barrier() { pthread_barrier_init(&BARRIER, NULL, 2); }
+void reset_barrier(pthread_barrier_t *barrier) {
+  pthread_barrier_init(barrier, NULL, 2);
+}
 
-void wait_on_barrier() {
-  int rc = pthread_barrier_wait(&BARRIER);
+void wait_on_barrier(pthread_barrier_t *barrier) {
+  int rc = pthread_barrier_wait(barrier);
   if (rc != PTHREAD_BARRIER_SERIAL_THREAD && rc != 0) {
     fprintf(stderr, "`pthread_barrier_wait()` failed. return code = %d\n", rc);
     exit(EXIT_FAILURE);
@@ -87,6 +89,8 @@ void on_connection_lost(void *context, char *cause) {
 }
 
 int run_logger(void *arg) {
+  pthread_barrier_t *barrier = (pthread_barrier_t *)arg;
+
   while (true) {
     if (FINISHED) {
       break;
@@ -118,7 +122,7 @@ int run_logger(void *arg) {
     SINCE_LAST_RECORD = now;
   }
 
-  wait_on_barrier();
+  wait_on_barrier(barrier);
 }
 
 void on_disconnect_failure(void *context, MQTTAsync_failureData *response) {
@@ -130,7 +134,7 @@ void on_disconnect(void *context, MQTTAsync_successData *response) {
   if (VERBOSE) {
     fprintf(stderr, "Successful disconnection\n");
   }
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
 }
 
 void on_send_failure(void *context, MQTTAsync_failureData *response) {
@@ -144,7 +148,7 @@ void on_send(void *context, MQTTAsync_successData *response) {
     fprintf(stderr, "Message with token value %d delivery confirmed\n",
             response->token);
   }
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
 }
 
 void on_connect_failure(void *context, MQTTAsync_failureData *response) {
@@ -156,7 +160,7 @@ void on_connect(void *context, MQTTAsync_successData *response) {
   if (VERBOSE) {
     fprintf(stderr, "Successful connection\n");
   }
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
 }
 
 void on_subscribe(void *context, MQTTAsync_successData *response) {
@@ -167,7 +171,7 @@ void on_subscribe(void *context, MQTTAsync_successData *response) {
   clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
   SINCE_LAST_RECORD = SINCE_START;
 
-  int rc = thrd_create(&logger_thread, run_logger, NULL);
+  int rc = thrd_create(&logger_thread, run_logger, &BARRIER);
   if (rc != thrd_success) {
     fprintf(stderr, "thrd_create() failed\n");
     exit(EXIT_FAILURE);
@@ -237,18 +241,51 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
   pubmsg.qos = qos;
   pubmsg.retained = 0;
 
+  /* Record first timestamp */
+  clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
+  SINCE_LAST_RECORD = SINCE_START;
+
+  /* Spawn the logger thread */
+  pthread_barrier_t logger_barrier;
+  reset_barrier(&logger_barrier);
+
+  rc = thrd_create(&logger_thread, run_logger, &logger_barrier);
+  if (rc != thrd_success) {
+    fprintf(stderr, "thrd_create() failed\n");
+    exit(EXIT_FAILURE);
+  }
+
   /* Produce messages */
-  for (uint32_t cnt = 0; MAX_COUNT == 0 || cnt < (uint32_t)MAX_COUNT;
-       cnt += 1) {
+  long cnt = 0;
+
+  while (!FINISHED) {
+    cnt += 1;
+
+    /* Check count limit */
+    if (MAX_COUNT != 0 && cnt > MAX_COUNT) {
+      FINISHED = true;
+      break;
+    }
+
     memcpy(payload, &cnt, sizeof(cnt));
 
-    reset_barrier();
+    reset_barrier(&BARRIER);
     rc = MQTTAsync_sendMessage(client, topic, &pubmsg, &opts);
     if (rc != MQTTASYNC_SUCCESS) {
       fprintf(stderr, "Failed to start sendMessage, return code %d\n", rc);
       exit(EXIT_FAILURE);
     }
-    wait_on_barrier();
+    wait_on_barrier(&BARRIER);
+    atomic_fetch_add_explicit(&ACCUMULATIVE_BYTES, payload_size,
+                              memory_order_acq_rel);
+  }
+
+  wait_on_barrier(&logger_barrier);
+
+  rc = thrd_join(logger_thread, NULL);
+  if (rc != thrd_success) {
+    fprintf(stderr, "thrd_join() failed\n");
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -260,7 +297,7 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
   opts.onFailure = on_subscribe_failure;
   opts.context = client;
 
-  reset_barrier();
+  reset_barrier(&BARRIER);
   rc = MQTTAsync_subscribe(client, topic, qos, &opts);
   if (rc != MQTTASYNC_SUCCESS) {
     fprintf(stderr, "Failed to start subscribe, return code %d\n", rc);
@@ -268,7 +305,7 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
   }
 
   /* wait until the all tasks finish */
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
   rc = thrd_join(logger_thread, NULL);
   if (rc != thrd_success) {
     fprintf(stderr, "thrd_join() failed\n");
@@ -438,13 +475,13 @@ int main(int argc, char *argv[]) {
   conn_opts.onFailure = on_connect_failure;
   conn_opts.context = client;
 
-  reset_barrier();
+  reset_barrier(&BARRIER);
   rc = MQTTAsync_connect(client, &conn_opts);
   if (rc != MQTTASYNC_SUCCESS) {
     fprintf(stderr, "Failed to start connect, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
 
   /* run publishing or subscription */
   if (role == PUBLISHER) {
@@ -462,13 +499,13 @@ int main(int argc, char *argv[]) {
   opts.onFailure = on_disconnect_failure;
   opts.context = client;
 
-  reset_barrier();
+  reset_barrier(&BARRIER);
   rc = MQTTAsync_disconnect(client, &opts);
   if (rc != MQTTASYNC_SUCCESS) {
     fprintf(stderr, "Failed to start disconnect, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
-  wait_on_barrier();
+  wait_on_barrier(&BARRIER);
 
   MQTTAsync_destroy(&client);
   return rc;
