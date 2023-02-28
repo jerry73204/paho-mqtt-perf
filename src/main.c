@@ -2,11 +2,13 @@
 #include <bits/time.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -19,18 +21,19 @@ static const char DEFAULT_ADDRESS[] = "tcp://localhost:1883";
 typedef enum role { UNSPECIFIED, PUBLISHER, SUBSCRIBER } Role;
 
 /* Global variables */
-bool FINISHED = false;
+atomic_bool FINISHED = false;
 bool VERBOSE = false;
 pthread_barrier_t BARRIER;
 char TOPIC[256] = {0};
 char CLIENT_ID[256] = {0};
 long INTERVAL_MILLIS = 1000;
 long MAX_MILLIS = 0;
-uint64_t ACCUMULATIVE_BYTES = 0;
+atomic_uint_fast64_t ACCUMULATIVE_BYTES = 0;
 uint64_t ACCUMULATIVE_COUNT = 0;
 long MAX_COUNT = 0;
 struct timespec SINCE_START;
 struct timespec SINCE_LAST_RECORD;
+thrd_t logger_thread;
 
 void reset_barrier() { pthread_barrier_init(&BARRIER, NULL, 2); }
 
@@ -67,10 +70,10 @@ void timespec_add_millis(struct timespec *tp, long millis) {
   tp->tv_nsec = rem;
 }
 
-long timespec_sub_millis(struct timespec *lhs, struct timespec *rhs) {
+long timespec_sub_micros(struct timespec *lhs, struct timespec *rhs) {
   time_t diff_sec = lhs->tv_sec - rhs->tv_sec;
   long diff_nsec = lhs->tv_nsec - rhs->tv_nsec;
-  return diff_sec * 1000 + diff_nsec / 1000000;
+  return diff_sec * 1000000 + diff_nsec / 1000;
 }
 
 void on_connection_lost(void *context, char *cause) {
@@ -81,6 +84,41 @@ void on_connection_lost(void *context, char *cause) {
   fprintf(stderr, "     cause: %s\n", cause);
 
   exit(EXIT_FAILURE);
+}
+
+int run_logger(void *arg) {
+  while (true) {
+    if (FINISHED) {
+      break;
+    }
+
+    /* Sleep for a while */
+    usleep(INTERVAL_MILLIS * 1000);
+
+    /* Save current time */
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    /* Check time limit */
+    if (MAX_MILLIS != 0) {
+      long elapsed_micros = timespec_sub_micros(&now, &SINCE_START);
+      if (elapsed_micros > MAX_MILLIS * 1000) {
+        FINISHED = true;
+        break;
+      }
+    }
+
+    /* Print byte rate rate */
+    long elapsed_micros = timespec_sub_micros(&now, &SINCE_LAST_RECORD);
+    uint_fast64_t acc_bytes =
+        atomic_exchange_explicit(&ACCUMULATIVE_BYTES, 0, memory_order_acq_rel);
+    double rate = (double)acc_bytes / (double)elapsed_micros * 1000000.0;
+    printf("%lf\n", rate);
+
+    SINCE_LAST_RECORD = now;
+  }
+
+  wait_on_barrier();
 }
 
 void on_disconnect_failure(void *context, MQTTAsync_failureData *response) {
@@ -125,7 +163,15 @@ void on_subscribe(void *context, MQTTAsync_successData *response) {
   if (VERBOSE) {
     fprintf(stderr, "Subscribe succeeded\n");
   }
-  wait_on_barrier();
+
+  clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
+  SINCE_LAST_RECORD = SINCE_START;
+
+  int rc = thrd_create(&logger_thread, run_logger, NULL);
+  if (rc != thrd_success) {
+    fprintf(stderr, "thrd_create() failed\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 void on_subscribe_failure(void *context, MQTTAsync_failureData *response) {
@@ -154,39 +200,16 @@ int on_message_arrived(void *context, char *topic_name, int topic_len,
   }
 
   /* Record payload length */
-  ACCUMULATIVE_BYTES += (uint64_t)msg->payloadlen;
+  atomic_fetch_add_explicit(&ACCUMULATIVE_BYTES, (uint_fast64_t)msg->payloadlen,
+                            memory_order_acq_rel);
 
-  /* Show message log after a period of time */
-  struct timespec thresh = SINCE_LAST_RECORD;
-  timespec_add_millis(&thresh, INTERVAL_MILLIS);
-
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-
+  /* Check message count limit */
   if (MAX_COUNT != 0) {
     ACCUMULATIVE_COUNT += 1;
     if (ACCUMULATIVE_COUNT > MAX_COUNT) {
       FINISHED = true;
-      wait_on_barrier();
       return 1;
     }
-  }
-
-  if (MAX_MILLIS != 0) {
-    long elapsed_millis = timespec_sub_millis(&now, &SINCE_START);
-    if (elapsed_millis > MAX_MILLIS) {
-      FINISHED = true;
-      wait_on_barrier();
-      return 1;
-    }
-  }
-
-  if (timespec_cmp(&now, &thresh) == 1) {
-    long elapsed_millis = timespec_sub_millis(&now, &SINCE_LAST_RECORD);
-    double rate = (double)ACCUMULATIVE_BYTES / (double)elapsed_millis * 1000.0;
-    ACCUMULATIVE_BYTES = 0;
-    printf("%lf\n", rate);
-    SINCE_LAST_RECORD = now;
   }
 
   return 1;
@@ -243,13 +266,14 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
     fprintf(stderr, "Failed to start subscribe, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
-  wait_on_barrier();
 
-  /* wait until the task finished */
-  reset_barrier();
-  clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
-  SINCE_LAST_RECORD = SINCE_START;
+  /* wait until the all tasks finish */
   wait_on_barrier();
+  rc = thrd_join(logger_thread, NULL);
+  if (rc != thrd_success) {
+    fprintf(stderr, "thrd_join() failed\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 int main(int argc, char *argv[]) {
