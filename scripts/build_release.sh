@@ -8,5 +8,5 @@ source "$script_dir/env.sh"
 cmake \
     -B build \
     -S . \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    -DCMAKE_BUILD_TYPE=Release
 cmake --build build
