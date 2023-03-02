@@ -1,4 +1,4 @@
-PAHO_MQTT_DIR=$PWD/deps/paho.mqtt.c-1.3.11
+PAHO_MQTT_DIR=$PWD/deps/paho.mqtt.c-1.3.11/install
 
 export CPATH="$PAHO_MQTT_DIR/include:$CPATH"
 export LD_LIBRARY_PATH="$PAHO_MQTT_DIR/lib:$LD_LIBRARY_PATH"
