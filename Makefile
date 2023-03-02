@@ -1,20 +1,22 @@
-.PHONY: default build clean
+.PHONY: default build clean install_paho_mqtt_c run_publisher run_subscriber
 
-TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+# TOOLCHAIN_FILE=/home/newslab/repos/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 default: build
 
-build:
-ifdef TOOLCHAIN_FILE
-	cmake -B build -S . \
-		-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_FILE) \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo
-else
-	cmake -B build -S . \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo
-endif
+build: ./build/paho-mqtt-perf
 
-	cmake --build build
+./build/paho-mqtt-perf:
+	./scripts/build.sh
+
+run_publisher:
+	./build/paho-mqtt-perf -r publisher -b tcp://192.168.1.1:1883 -t BENCH -p 32
+
+run_subscriber:
+	./build/paho-mqtt-perf -r subscriber -b tcp://192.168.1.1:1883 -t BENCH
 
 clean:
 	rm -rf build
+
+install_paho_mqtt_c:
+	./scripts/install_paho_mqtt_c.sh
