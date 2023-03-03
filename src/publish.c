@@ -21,7 +21,6 @@ void on_send(void *context, MQTTAsync_successData *response) {
     fprintf(stderr, "Message with token value %d delivery confirmed\n",
             response->token);
   }
-  wait_on_barrier(&BARRIER);
 }
 
 void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
@@ -51,10 +50,7 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
   SINCE_LAST_RECORD = SINCE_START;
 
   /* Spawn the logger thread */
-  pthread_barrier_t logger_barrier;
-  reset_barrier(&logger_barrier);
-
-  rc = thrd_create(&logger_thread, run_logger, &logger_barrier);
+  rc = thrd_create(&logger_thread, run_logger, NULL);
   if (rc != thrd_success) {
     fprintf(stderr, "thrd_create() failed\n");
     exit(EXIT_FAILURE);
@@ -74,18 +70,14 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
 
     memcpy(payload, &cnt, sizeof(cnt));
 
-    reset_barrier(&BARRIER);
     rc = MQTTAsync_sendMessage(client, topic, &pubmsg, &opts);
     if (rc != MQTTASYNC_SUCCESS) {
       fprintf(stderr, "Failed to start sendMessage, return code %d\n", rc);
       exit(EXIT_FAILURE);
     }
-    wait_on_barrier(&BARRIER);
     atomic_fetch_add_explicit(&ACCUMULATIVE_BYTES, payload_size,
                               memory_order_acq_rel);
   }
-
-  wait_on_barrier(&logger_barrier);
 
   rc = thrd_join(logger_thread, NULL);
   if (rc != thrd_success) {

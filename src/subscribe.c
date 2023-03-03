@@ -13,11 +13,13 @@ void on_subscribe(void *context, MQTTAsync_successData *response) {
   clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
   SINCE_LAST_RECORD = SINCE_START;
 
-  int rc = thrd_create(&logger_thread, run_logger, &BARRIER);
+  int rc = thrd_create(&logger_thread, run_logger, NULL);
   if (rc != thrd_success) {
     fprintf(stderr, "thrd_create() failed\n");
     exit(EXIT_FAILURE);
   }
+
+  wait_on_barrier(&BARRIER);
 }
 
 void on_subscribe_failure(void *context, MQTTAsync_failureData *response) {
@@ -40,12 +42,12 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
     fprintf(stderr, "Failed to start subscribe, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
+  wait_on_barrier(&BARRIER);
 
   /* wait until the all tasks finish */
-  wait_on_barrier(&BARRIER);
   rc = thrd_join(logger_thread, NULL);
   if (rc != thrd_success) {
-    fprintf(stderr, "thrd_join() failed\n");
+    fprintf(stderr, "thrd_join() failed with return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
 }

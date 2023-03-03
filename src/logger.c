@@ -9,8 +9,6 @@
 #include "logger.h"
 
 int run_logger(void *arg) {
-  pthread_barrier_t *barrier = (pthread_barrier_t *)arg;
-
   while (true) {
     if (FINISHED) {
       break;
@@ -41,6 +39,4 @@ int run_logger(void *arg) {
 
     SINCE_LAST_RECORD = now;
   }
-
-  wait_on_barrier(barrier);
 }
