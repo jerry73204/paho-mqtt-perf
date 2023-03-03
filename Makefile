@@ -13,10 +13,10 @@ build_release:
 	./scripts/build_release.sh
 
 run_publisher:
-	./build/paho-mqtt-perf -r publisher -b tcp://192.168.1.1:1883 -t BENCH -p 32
+	@./build/paho-mqtt-perf -r publisher -b tcp://192.168.1.1:1883 -t BENCH -p 32
 
 run_subscriber:
-	./build/paho-mqtt-perf -r subscriber -b tcp://192.168.1.1:1883 -t BENCH
+	@./build/paho-mqtt-perf -r subscriber -b tcp://192.168.1.1:1883 -t BENCH
 
 clean:
 	rm -rf build deps
