@@ -57,7 +57,7 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
   }
 
   /* Produce messages */
-  long cnt = 0;
+  uint32_t cnt = 0;
 
   while (!FINISHED) {
     cnt += 1;
