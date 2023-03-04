@@ -27,17 +27,12 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
                    int qos) {
   int rc;
 
-  /* Generate payload buffer */
+  /* Generate a message */
   uint8_t *payload = (uint8_t *)calloc(1, payload_size);
   if (payload == NULL) {
     fprintf(stderr, "Unable to allocate payload. errno = %d\n", errno);
     exit(EXIT_FAILURE);
   }
-
-  MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
-  opts.onSuccess = on_send;
-  opts.onFailure = on_send_failure;
-  opts.context = client;
 
   MQTTAsync_message pubmsg = MQTTAsync_message_initializer;
   pubmsg.payload = payload;
@@ -55,6 +50,12 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
     fprintf(stderr, "thrd_create() failed\n");
     exit(EXIT_FAILURE);
   }
+
+  /* Configure response callbacks */
+  MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
+  opts.onSuccess = on_send;
+  opts.onFailure = on_send_failure;
+  opts.context = client;
 
   /* Produce messages */
   uint32_t cnt = 0;

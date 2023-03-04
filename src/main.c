@@ -157,9 +157,11 @@ int main(int argc, char *argv[]) {
   }
 
   /* Create a client */
+  MQTTAsync_createOptions create_opts = MQTTAsync_createOptions_initializer;
+  create_opts.MQTTVersion = MQTTVERSION_5;
   MQTTAsync client;
-  rc = MQTTAsync_create(&client, address, CLIENT_ID,
-                        MQTTCLIENT_PERSISTENCE_NONE, NULL);
+  rc = MQTTAsync_createWithOptions(&client, address, CLIENT_ID,
+                                   MQTTCLIENT_PERSISTENCE_NONE, NULL, &create_opts);
   if (rc != MQTTASYNC_SUCCESS) {
     fprintf(stderr, "Failed to create client object, return code %d\n", rc);
     exit(EXIT_FAILURE);
@@ -187,6 +189,7 @@ int main(int argc, char *argv[]) {
   conn_opts.onSuccess = on_connect;
   conn_opts.onFailure = on_connect_failure;
   conn_opts.context = client;
+  conn_opts.MQTTVersion = MQTTVERSION_5;
 
   reset_barrier(&BARRIER);
   rc = MQTTAsync_connect(client, &conn_opts);
