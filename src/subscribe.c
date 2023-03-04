@@ -76,6 +76,8 @@ int on_message_arrived_for_sub(void *context, char *topic_name, int topic_len,
   atomic_fetch_add_explicit(&ACCUMULATIVE_BYTES, (uint_fast64_t)msg->payloadlen,
                             memory_order_acq_rel);
 
+  MQTTAsync_freeMessage(&msg);
+
   /* Check message count limit */
   if (MAX_COUNT != 0) {
     ACCUMULATIVE_COUNT += 1;
