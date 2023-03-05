@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 
   /* Connect to the broker */
   MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer5;
-  conn_opts.keepAliveInterval = 3;
+  conn_opts.keepAliveInterval = 0;
   conn_opts.onSuccess5 = on_connect;
   conn_opts.onFailure5 = on_connect_failure;
   conn_opts.context = client;
