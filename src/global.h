@@ -1,9 +1,9 @@
 #pragma once
-#include <stdatomic.h>
-#include <threads.h>
 #include <pthread.h>
-#include <stdint.h>
+#include <stdatomic.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <threads.h>
 
 static const char ROLE_PUBLISHER[] = "publisher";
 static const char ROLE_SUBSCRIBER[] = "subscriber";

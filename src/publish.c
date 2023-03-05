@@ -1,22 +1,22 @@
-#include <MQTTAsync.h>
-#include <errno.h>
-#include <threads.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
+#include "publish.h"
 #include "global.h"
 #include "logger.h"
 #include "utils.h"
-#include "publish.h"
+#include <MQTTAsync.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <threads.h>
 
-void on_send_failure(void *context, MQTTAsync_failureData *response) {
+void on_send_failure(void *context, MQTTAsync_failureData5 *response) {
   fprintf(stderr, "Message send failed token %d error code %d\n",
           response->token, response->code);
   exit(EXIT_FAILURE);
 }
 
-void on_send(void *context, MQTTAsync_successData *response) {
+void on_send(void *context, MQTTAsync_successData5 *response) {
   if (VERBOSE) {
     fprintf(stderr, "Message with token value %d delivery confirmed\n",
             response->token);
@@ -53,8 +53,8 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
 
   /* Configure response callbacks */
   MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
-  opts.onSuccess = on_send;
-  opts.onFailure = on_send_failure;
+  opts.onSuccess5 = on_send;
+  opts.onFailure5 = on_send_failure;
   opts.context = client;
 
   /* Produce messages */
@@ -73,8 +73,13 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
 
     rc = MQTTAsync_sendMessage(client, topic, &pubmsg, &opts);
     if (rc != MQTTASYNC_SUCCESS) {
-      fprintf(stderr, "Failed to start sendMessage, return code %d\n", rc);
-      exit(EXIT_FAILURE);
+      if (rc == MQTTASYNC_MAX_BUFFERED_MESSAGES) {
+        /* When the buffer is full, back off for 1ms. */
+        usleep(1000);
+      } else {
+        fprintf(stderr, "Failed to start sendMessage, return code %d\n", rc);
+        exit(EXIT_FAILURE);
+      }
     }
     atomic_fetch_add_explicit(&ACCUMULATIVE_BYTES, payload_size,
                               memory_order_acq_rel);
@@ -89,6 +94,6 @@ void run_publisher(MQTTAsync client, char *topic, size_t payload_size,
 
 int on_message_arrived_for_pub(void *context, char *topic_name, int topic_len,
                                MQTTAsync_message *msg) {
-    MQTTAsync_freeMessage(&msg);
-    return 1;
+  MQTTAsync_freeMessage(&msg);
+  return 1;
 }

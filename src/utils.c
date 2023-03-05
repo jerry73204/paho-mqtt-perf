@@ -1,7 +1,7 @@
+#include "utils.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "utils.h"
 
 void reset_barrier(pthread_barrier_t *barrier) {
   pthread_barrier_init(barrier, NULL, 2);

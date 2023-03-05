@@ -14,24 +14,24 @@ void on_connection_lost(void *context, char *cause) {
   exit(EXIT_FAILURE);
 }
 
-void on_disconnect_failure(void *context, MQTTAsync_failureData *response) {
-  fprintf(stderr, "Disconnect failed\n");
+void on_disconnect_failure(void *context, MQTTAsync_failureData5 *response) {
+  fprintf(stderr, "Disconnection failed\n");
   exit(EXIT_FAILURE);
 }
 
-void on_disconnect(void *context, MQTTAsync_successData *response) {
+void on_disconnect(void *context, MQTTAsync_successData5 *response) {
   if (VERBOSE) {
     fprintf(stderr, "Successful disconnection\n");
   }
   wait_on_barrier(&BARRIER);
 }
 
-void on_connect_failure(void *context, MQTTAsync_failureData *response) {
-  fprintf(stderr, "Connect failed, rc %d\n", response ? response->code : 0);
+void on_connect_failure(void *context, MQTTAsync_failureData5 *response) {
+  fprintf(stderr, "Connection failed, rc %d\n", response ? response->code : 0);
   exit(EXIT_FAILURE);
 }
 
-void on_connect(void *context, MQTTAsync_successData *response) {
+void on_connect(void *context, MQTTAsync_successData5 *response) {
   if (VERBOSE) {
     fprintf(stderr, "Successful connection\n");
   }

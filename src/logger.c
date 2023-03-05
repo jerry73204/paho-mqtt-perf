@@ -1,12 +1,12 @@
-#include <stdio.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+#include "logger.h"
 #include "global.h"
 #include "utils.h"
-#include "logger.h"
+#include <pthread.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 int run_logger(void *arg) {
   while (true) {

@@ -1,3 +1,9 @@
+#include "connect.h"
+#include "global.h"
+#include "logger.h"
+#include "publish.h"
+#include "subscribe.h"
+#include "utils.h"
 #include <MQTTAsync.h>
 #include <errno.h>
 #include <pthread.h>
@@ -10,12 +16,6 @@
 #include <threads.h>
 #include <time.h>
 #include <unistd.h>
-#include "publish.h"
-#include "subscribe.h"
-#include "logger.h"
-#include "global.h"
-#include "utils.h"
-#include "connect.h"
 
 typedef enum role { UNSPECIFIED, PUBLISHER, SUBSCRIBER } Role;
 
@@ -159,22 +159,24 @@ int main(int argc, char *argv[]) {
   /* Create a client */
   MQTTAsync_createOptions create_opts = MQTTAsync_createOptions_initializer;
   create_opts.MQTTVersion = MQTTVERSION_5;
+
   MQTTAsync client;
   rc = MQTTAsync_createWithOptions(&client, address, CLIENT_ID,
-                                   MQTTCLIENT_PERSISTENCE_NONE, NULL, &create_opts);
+                                   MQTTCLIENT_PERSISTENCE_NONE, NULL,
+                                   &create_opts);
   if (rc != MQTTASYNC_SUCCESS) {
     fprintf(stderr, "Failed to create client object, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
 
   /* Set callbacks */
-  int (*msg_arrive_callback)(void*, char*, int, MQTTAsync_message*) = NULL;
+  int (*msg_arrive_callback)(void *, char *, int, MQTTAsync_message *) = NULL;
   if (role == PUBLISHER) {
-      msg_arrive_callback = on_message_arrived_for_pub;
+    msg_arrive_callback = on_message_arrived_for_pub;
   } else if (role == SUBSCRIBER) {
-      msg_arrive_callback = on_message_arrived_for_sub;
+    msg_arrive_callback = on_message_arrived_for_sub;
   }
-  
+
   rc = MQTTAsync_setCallbacks(client, NULL, on_connection_lost,
                               msg_arrive_callback, NULL);
   if (rc != MQTTASYNC_SUCCESS) {
@@ -183,18 +185,18 @@ int main(int argc, char *argv[]) {
   }
 
   /* Connect to the broker */
-  MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
-  conn_opts.keepAliveInterval = 20;
-  conn_opts.cleansession = 1;
-  conn_opts.onSuccess = on_connect;
-  conn_opts.onFailure = on_connect_failure;
+  MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer5;
+  conn_opts.keepAliveInterval = 3;
+  conn_opts.onSuccess5 = on_connect;
+  conn_opts.onFailure5 = on_connect_failure;
   conn_opts.context = client;
   conn_opts.MQTTVersion = MQTTVERSION_5;
+  conn_opts.cleanstart = 1;
 
   reset_barrier(&BARRIER);
   rc = MQTTAsync_connect(client, &conn_opts);
   if (rc != MQTTASYNC_SUCCESS) {
-    fprintf(stderr, "Failed to start connect, return code %d\n", rc);
+    fprintf(stderr, "Failed to start connection, return code %d\n", rc);
     exit(EXIT_FAILURE);
   }
   wait_on_barrier(&BARRIER);
@@ -211,8 +213,8 @@ int main(int argc, char *argv[]) {
 
   /* disconnect */
   MQTTAsync_disconnectOptions opts = MQTTAsync_disconnectOptions_initializer;
-  opts.onSuccess = on_disconnect;
-  opts.onFailure = on_disconnect_failure;
+  opts.onSuccess5 = on_disconnect;
+  opts.onFailure5 = on_disconnect_failure;
   opts.context = client;
 
   reset_barrier(&BARRIER);

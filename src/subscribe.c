@@ -1,9 +1,9 @@
-#include <MQTTAsync.h>
-#include <stdlib.h>
 #include "subscribe.h"
 #include "global.h"
 #include "logger.h"
 #include "utils.h"
+#include <MQTTAsync.h>
+#include <stdlib.h>
 
 void on_subscribe(void *context, MQTTAsync_successData *response) {
   if (VERBOSE) {
@@ -26,7 +26,6 @@ void on_subscribe_failure(void *context, MQTTAsync_failureData *response) {
   fprintf(stderr, "Subscribe failed, rc %d\n", response->code);
   exit(EXIT_FAILURE);
 }
-
 
 void run_subscriber(MQTTAsync client, char *topic, int qos) {
   int rc;
@@ -53,7 +52,7 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
 }
 
 int on_message_arrived_for_sub(void *context, char *topic_name, int topic_len,
-                       MQTTAsync_message *msg) {
+                               MQTTAsync_message *msg) {
   if (FINISHED) {
     return 1;
   }
