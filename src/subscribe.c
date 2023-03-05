@@ -5,9 +5,9 @@
 #include <MQTTAsync.h>
 #include <stdlib.h>
 
-void on_subscribe(void *context, MQTTAsync_successData *response) {
+void on_subscribe(void *context, MQTTAsync_successData5 *response) {
   if (VERBOSE) {
-    fprintf(stderr, "Subscribe succeeded\n");
+    fprintf(stderr, "Subscription succeeded\n");
   }
 
   clock_gettime(CLOCK_MONOTONIC, &SINCE_START);
@@ -22,8 +22,8 @@ void on_subscribe(void *context, MQTTAsync_successData *response) {
   wait_on_barrier(&BARRIER);
 }
 
-void on_subscribe_failure(void *context, MQTTAsync_failureData *response) {
-  fprintf(stderr, "Subscribe failed, rc %d\n", response->code);
+void on_subscribe_failure(void *context, MQTTAsync_failureData5 *response) {
+  fprintf(stderr, "Subscription failed, rc %d\n", response->code);
   exit(EXIT_FAILURE);
 }
 
@@ -31,8 +31,8 @@ void run_subscriber(MQTTAsync client, char *topic, int qos) {
   int rc;
   MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
 
-  opts.onSuccess = on_subscribe;
-  opts.onFailure = on_subscribe_failure;
+  opts.onSuccess5 = on_subscribe;
+  opts.onFailure5 = on_subscribe_failure;
   opts.context = client;
 
   reset_barrier(&BARRIER);
